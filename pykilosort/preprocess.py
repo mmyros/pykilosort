@@ -7,7 +7,7 @@ from scipy.signal import butter
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import lfilter, _get_lfilter_fun, median, convolve_gpu
+from .cptools import lfilter, _get_lfilter_fun, median, convolve_gpu, mean
 from .utils import _make_fortran
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ def get_filter_params(fs, fshigh=None, fslow=None):
         return butter(3, fshigh / fs * 2, 'high')
 
 
-def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True):
+def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True, car_first=True, car_type='median'):
     # filter this batch of data after common average referencing with the
     # median
     # buff is timepoints by channels
@@ -42,10 +42,15 @@ def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True):
     dataRAW = dataRAW - cp.mean(dataRAW, axis=0)  # subtract mean of each channel
     assert dataRAW.ndim == 2
 
-    # CAR, common average referencing by median
-    if car:
+    # CAR, common average referencing by median if requested before filtering
+    if car and car_first:
         # subtract median across channels
-        dataRAW = dataRAW - median(dataRAW, axis=1)[:, np.newaxis]
+        if car_type == 'median':
+            dataRAW = dataRAW - median(dataRAW, axis=1)[:, np.newaxis]
+        elif car_type == 'mean':
+            dataRAW = dataRAW - mean(dataRAW, axis=1)[:, np.newaxis]
+        else:
+            raise NotImplementedError(f"CAR type {car_type} is unknown!")
 
     # set up the parameters of the filter
     filter_params = get_filter_params(fs, fshigh=fshigh, fslow=fslow)
@@ -54,6 +59,17 @@ def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True):
     # used because it requires float64)
     datr = lfilter(*filter_params, dataRAW, axis=0)  # causal forward filter
     datr = lfilter(*filter_params, datr, axis=0, reverse=True)  # backward
+
+    # CAR, common average referencing by median or mean if requested after filtering
+    if car and not car_first:
+        # subtract median across channels
+        if car_type == 'median':
+            datr = datr - median(datr, axis=1)[:, np.newaxis]
+        elif car_type == 'mean':
+            datr = datr - mean(datr, axis=1)[:, np.newaxis]
+        else:
+            raise NotImplementedError(f"CAR type {car_type} is unknown!")
+
     return datr
 
 
@@ -184,6 +200,9 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
     fs = params.fs
     fshigh = params.fshigh
     nSkipCov = params.nSkipCov
+    car_first = params.car_first
+    car_type = params.car_type
+
 
     xc = probe.xc
     yc = probe.yc
@@ -209,7 +228,7 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
         buff_g = cp.asarray(buff, dtype=np.float32)
 
         # apply filters and median subtraction
-        datr = gpufilter(buff_g, fs=fs, fshigh=fshigh, chanMap=chanMap)
+        datr = gpufilter(buff_g, fs=fs, fshigh=fshigh, chanMap=chanMap, car_first=car_first, car_type=car_type)
         assert datr.flags.c_contiguous
 
         CC = CC + cp.dot(datr.T, datr) / NT  # sample covariance
@@ -250,6 +269,8 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     spkTh = params.spkTh
     nt0 = params.nt0
     minfr_goodchannels = params.minfr_goodchannels
+    car_first = params.car_first
+    car_type = params.car_type
 
     chanMap = probe.chanMap
     # Nchan = probe.Nchan
@@ -274,7 +295,7 @@ def get_good_channels(raw_data=None, probe=None, params=None):
         # Put on GPU.
         buff = cp.asarray(buff, dtype=np.float32)
         assert buff.flags.c_contiguous
-        datr = gpufilter(buff, chanMap=chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
+        datr = gpufilter(buff, chanMap=chanMap, fs=fs, fshigh=fshigh, fslow=fslow, car_first=car_first, car_type=car_type)
         assert datr.shape[0] > datr.shape[1]
 
         # very basic threshold crossings calculation
@@ -338,12 +359,15 @@ def preprocess(ctx):
     raw_data = ctx.raw_data
     ir = ctx.intermediate
 
+
     fs = params.fs
     fshigh = params.fshigh
     fslow = params.fslow
     Nbatch = ir.Nbatch
     NT = params.NT
     NTbuff = params.NTbuff
+    car_first = params.car_first
+    car_type = params.car_type
 
     Wrot = cp.asarray(ir.Wrot)
 
@@ -377,7 +401,7 @@ def preprocess(ctx):
             # apply filters and median subtraction
             buff = cp.asarray(buff, dtype=np.float32)
 
-            datr = gpufilter(buff, chanMap=probe.chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
+            datr = gpufilter(buff, chanMap=probe.chanMap, fs=fs, fshigh=fshigh, fslow=fslow, car_first=car_first, car_type=car_type)
             assert datr.flags.c_contiguous
 
             datr = datr[ioffset:ioffset + NT, :]  # remove timepoints used as buffers

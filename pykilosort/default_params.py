@@ -68,6 +68,8 @@ default_params.templateScaling = 20.0
 default_params.loc_range = [5, 4]
 default_params.long_range = [30, 6]
 
+default_params.car_first = True  # If True, common average is subtracted before filter is applied.
+default_params.car_type = 'median'  # Mean or median common average
 
 def set_dependent_params(params):
     """Add dependent parameters."""
