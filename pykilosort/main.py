@@ -58,6 +58,7 @@ def run(dat_path=None, probe=None, params=None, dir_path=None, stop_after=None, 
     print('Parameters used:')
     pprint(params)
     assert params
+    assert params.nt0 > 20, 'params.nt0 must be greater than 20'
 
     # dir path
     dir_path = dir_path or Path(dat_path).parent
