@@ -48,7 +48,7 @@ setup(
     packages=_package_tree('pykilosort'),
     package_dir={'pykilosort': 'pykilosort'},
     package_data={
-        'pykilosort': ['cuda'],
+        'pykilosort': ['pykilosort/cuda'],
     },
     include_package_data=True,
     keywords='kilosort,spike sorting,electrophysiology,neuroscience',
