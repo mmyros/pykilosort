@@ -192,6 +192,10 @@ def _ccg(st1, st2, nbins, tbin):
 
     while j <= N2 - 1:  # traverse all spikes in the second spike train
 
+        if (len(st1)<=ihigh) or (len(st2)<=j):
+            j+=1
+            continue  # Fixes IndexError in next line: index 0 is out of bounds for axis 0 with size 0
+
         while (ihigh <= N1 - 1) and (st1[ihigh] < st2[j] + dt):
             ihigh += 1  # keep increasing higher bound until it's OUTSIDE of dt range
 
