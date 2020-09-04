@@ -175,8 +175,8 @@ def _ccg(st1, st2, nbins, tbin):
     dt = nbins * tbin
 
     # fixes ValueError: zero-size array to reduction operation minimum which has no identity
-    if len(np.concatenate((st1, st2)))<2:
-        T=10e-10
+    if len(np.concatenate((st1, st2))) < 2:
+        T = 10e-10
     else:
         # Avoid divide by zero error.
         T = max(1e-10, np.max(np.concatenate((st1, st2))) - np.min(np.concatenate((st1, st2))))
@@ -1064,6 +1064,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
         pcw.append(cProjPC)
     tfw.close()
     pcw.close()
+
     # with open(, 'wb') as fp:
     #     save_large_array(fp, templateFeatures)
     # cProj = ir.cProj_c[cp.asnumpy(isort), :]
