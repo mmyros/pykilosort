@@ -174,8 +174,12 @@ def _ccg(st1, st2, nbins, tbin):
 
     dt = nbins * tbin
 
-    # Avoid divide by zero error.
-    T = max(1e-10, np.max(np.concatenate((st1, st2))) - np.min(np.concatenate((st1, st2))))
+    # fixes ValueError: zero-size array to reduction operation minimum which has no identity
+    if len(np.concatenate((st1, st2)))<2:
+        T=10e-10
+    else:
+        # Avoid divide by zero error.
+        T = max(1e-10, np.max(np.concatenate((st1, st2))) - np.min(np.concatenate((st1, st2))))
     N1 = max(1, len(st1))
     N2 = max(1, len(st2))
 
@@ -191,10 +195,6 @@ def _ccg(st1, st2, nbins, tbin):
     # (DEV_NOTES) the while loop below is far too slow as is
 
     while j <= N2 - 1:  # traverse all spikes in the second spike train
-
-        if (len(st1)<=ihigh) or (len(st2)<=j):
-            j+=1
-            continue  # Fixes IndexError in next line: index 0 is out of bounds for axis 0 with size 0
 
         while (ihigh <= N1 - 1) and (st1[ihigh] < st2[j] + dt):
             ihigh += 1  # keep increasing higher bound until it's OUTSIDE of dt range
