@@ -871,7 +871,9 @@ def checkClusters(ctx):
     # 3) Remove these indices from every variable that has n_clusters
 
     ir = ctx.intermediate
-    max_id = int(np.max(ir.st3_c[:, 1])) + 1
+    # max_id = int(np.max(ir.st3_c[:, 1])) + 1 # Rare off-by-one error
+    max_id=ir.iNeigh_s.shape[1]
+
     ids = cp.asnumpy(np.unique(ir.st3_c[:, 1]).astype(np.int))
     # Check if the max cluster id is equal to the number of cluster ids assigned to spikes.
     if max_id != len(ids):  # see which cluster ids are missing
