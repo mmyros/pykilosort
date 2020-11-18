@@ -284,6 +284,8 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     # TODO: move_to_config - every N batches
     for ibatch in tqdm(range(0, Nbatch, int(ceil(Nbatch / 100))), desc="Finding good channels"):
         i = NT * ibatch
+        if (i + NT) > raw_data.shape[0]:
+            break
         buff = raw_data[i:i + NT]
         # buff = _make_fortran(buff)
         # NOTE: using C order now

@@ -872,7 +872,7 @@ def checkClusters(ctx):
 
     ir = ctx.intermediate
     # max_id = int(np.max(ir.st3_c[:, 1])) + 1 # Rare off-by-one error
-    max_id=ir.iNeigh_s.shape[1]
+    max_id = ir.iNeigh_s.shape[1]
 
     ids = cp.asnumpy(np.unique(ir.st3_c[:, 1]).astype(np.int))
     # Check if the max cluster id is equal to the number of cluster ids assigned to spikes.
@@ -908,6 +908,49 @@ def checkClusters(ctx):
 
     ctx.ir = ir
     return ctx
+
+
+def save_pcs(spikes_to_remove, cProj, cProjPC, savePath, st3, isort):
+    # PCs
+    ix = spikes_to_remove  # length: number of spikes BEFORE -1 cluster removed
+
+    cProj_shape = cProj.shape
+    cProj_shape = (st3.shape[0],) + cProj_shape[1:]
+
+    cProjPC_shape = cProjPC.shape
+    cProjPC_shape = (st3.shape[0],) + cProjPC_shape[1:]
+
+    tfw = NpyWriter(join(savePath, 'template_features.npy'), cProj_shape, np.float32)
+    pcw = NpyWriter(join(savePath, 'pc_features.npy'), cProjPC_shape, np.float32)
+
+    isort = cp.asnumpy(isort)
+    N = len(ix)  # number of spikes including those assigned to -1
+    assert cProj.shape[0] == N
+    assert cProjPC.shape[0] == N
+
+    spikes_to_keep = np.nonzero(~ix)[0]  # indices of the spikes to keep in the cProj index space
+
+    # if len(ix) > ir.cProj.shape[0]:
+    #     ix = ix[:cProj.shape[0]]
+    # else:
+    #     ix = np.pad(ix, (0, ir.cProj.shape[0] - len(ix)), mode='constant')
+    # assert ix.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
+
+    k = int(ceil(float(N) / 100))  # 100 chunks
+    assert k >= 1
+    for i in tqdm(range(0, N, k), desc="Saving template and PC features"):
+        # NOTE: cProj and cProjPC still have the spikes assigned to -1 that have yet to be removed
+
+        # spike indices in cProj that need to be kept in this chunk
+        ind = spikes_to_keep[isort[i:i + k]]
+
+        cProj = ir.cProj[ind]
+        cProjPC = ir.cProjPC[ind]
+
+        tfw.append(cProj)
+        pcw.append(cProjPC)
+    tfw.close()
+    pcw.close()
 
 
 # TODO: design - let's split this out into a different module and a class / a few functions
@@ -1026,46 +1069,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
     tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
 
-    # PCs
-    ix = ir.spikes_to_remove  # length: number of spikes BEFORE -1 cluster removed
-
-    cProj_shape = ir.cProj.shape
-    cProj_shape = (st3.shape[0],) + cProj_shape[1:]
-
-    cProjPC_shape = ir.cProjPC.shape
-    cProjPC_shape = (st3.shape[0],) + cProjPC_shape[1:]
-
-    tfw = NpyWriter(join(savePath, 'template_features.npy'), cProj_shape, np.float32)
-    pcw = NpyWriter(join(savePath, 'pc_features.npy'), cProjPC_shape, np.float32)
-
-    isort = cp.asnumpy(isort)
-    N = len(ix)  # number of spikes including those assigned to -1
-    assert ir.cProj.shape[0] == N
-    assert ir.cProjPC.shape[0] == N
-
-    spikes_to_keep = np.nonzero(~ix)[0]  # indices of the spikes to keep in the cProj index space
-
-    # if len(ix) > ir.cProj.shape[0]:
-    #     ix = ix[:cProj.shape[0]]
-    # else:
-    #     ix = np.pad(ix, (0, ir.cProj.shape[0] - len(ix)), mode='constant')
-    # assert ix.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
-
-    k = int(ceil(float(N) / 100))  # 100 chunks
-    assert k >= 1
-    for i in tqdm(range(0, N, k), desc="Saving template and PC features"):
-        # NOTE: cProj and cProjPC still have the spikes assigned to -1 that have yet to be removed
-
-        # spike indices in cProj that need to be kept in this chunk
-        ind = spikes_to_keep[isort[i:i + k]]
-
-        cProj = ir.cProj[ind]
-        cProjPC = ir.cProjPC[ind]
-
-        tfw.append(cProj)
-        pcw.append(cProjPC)
-    tfw.close()
-    pcw.close()
+    save_pcs(ir.spikes_to_remove, ir.cProj, ir.cProjPC, savePath, st3, isort)
 
     # with open(, 'wb') as fp:
     #     save_large_array(fp, templateFeatures)
