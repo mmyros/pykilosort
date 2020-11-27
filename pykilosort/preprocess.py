@@ -186,7 +186,7 @@ def whiteningLocal(CC, yc, xc, nRange):
     return Wrot
 
 
-def get_whitening_matrix(raw_data=None, probe=None, params=None):
+def get_whitening_matrix(raw_data=None, probe=None, params=None, nSkipCov=None):
     """
     based on a subset of the data, compute a channel whitening matrix
     this requires temporal filtering first (gpufilter)
@@ -199,7 +199,8 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
     NT = params.NT
     fs = params.fs
     fshigh = params.fshigh
-    nSkipCov = params.nSkipCov
+    if nSkipCov is None:
+        nSkipCov = params.nSkipCov
     car_first = params.car_first
     car_type = params.car_type
 
@@ -233,7 +234,7 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
 
         CC = CC + cp.dot(datr.T, datr) / NT  # sample covariance
 
-    CC = CC / ceil((Nbatch - 1) / nSkipCov)
+    CC = CC / max(ceil((Nbatch - 1) / nSkipCov), 1)
 
     if whiteningRange < np.inf:
         #  if there are too many channels, a finite whiteningRange is more robust to noise
@@ -273,7 +274,6 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     car_type = params.car_type
 
     chanMap = probe.chanMap
-    # Nchan = probe.Nchan
     NchanTOT = len(chanMap)
 
     ich = []
@@ -332,6 +332,8 @@ def get_good_channels(raw_data=None, probe=None, params=None):
 
     if len(igood) == 0:
         raise RuntimeError("No good channels found! Verify your raw data and parameters.")
+    if np.sum(igood) == 0:
+        raise RuntimeError("No good channels found! Verify your raw data and parameters.")
 
     logger.info('Found %d threshold crossings in %2.2f seconds of data.' % (k, ttime))
     logger.info('Found %d/%d bad channels.' % (np.sum(~igood), len(igood)))
@@ -360,7 +362,6 @@ def preprocess(ctx):
     probe = ctx.probe
     raw_data = ctx.raw_data
     ir = ctx.intermediate
-
 
     fs = params.fs
     fshigh = params.fshigh

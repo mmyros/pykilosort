@@ -1,6 +1,11 @@
 import logging
 import os
 
+# TODO: move this to config
+# TODO: setting to true not yet implemented
+ENABLE_STABLEMODE = False #True
+ENSURE_DETERM = False 
+
 if os.getenv('MOCK_CUPY', False):
     from pykilosort.testing.mock_cupy import cupy 
     from pykilosort.testing.mock_cupyx import cupyx
@@ -9,7 +14,7 @@ else:
     import cupyx
 
 from .utils import Bunch, memmap_binary_file, read_data, load_probe  # noqa
-from .main import run  # noqa
+from .main import run, run_export, run_spikesort, run_preprocess  # noqa
 
 
 __version__ = '2.0.0a0'
