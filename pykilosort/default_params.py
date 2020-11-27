@@ -75,6 +75,6 @@ def set_dependent_params(params):
     """Add dependent parameters."""
     # we need buffers on both sides for filtering
     params.NT = params.get('NT', 64 * 1024 + params.ntbuff)
-    params.NTbuff = params.get('NTbuff', params.NT + 4 * params.ntbuff)
+    params.NTbuff = params.get('NTbuff', params.NT + 3 * params.ntbuff)
     params.nt0min = params.get('nt0min', ceil(20 * params.nt0 / 61))
     return params
